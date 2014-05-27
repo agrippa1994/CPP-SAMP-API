@@ -80,10 +80,12 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Process.cpp" />
+    <ClCompile Include="RemoteMemoryAllocation.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="algorithm.h" />
     <ClInclude Include="Process.h" />
+    <ClInclude Include="RemoteMemoryAllocation.h" />
     <ClInclude Include="windows.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

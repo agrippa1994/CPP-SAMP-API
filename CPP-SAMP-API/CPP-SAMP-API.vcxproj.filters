@@ -21,6 +21,9 @@
     <ClCompile Include="Process.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
+    <ClCompile Include="RemoteMemoryAllocation.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="windows.h">
@@ -30,6 +33,9 @@
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="algorithm.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="RemoteMemoryAllocation.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>

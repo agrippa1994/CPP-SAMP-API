@@ -1,12 +1,14 @@
 #pragma once
 #include "windows.h"
+#include "RemoteMemoryAllocation.h"
+
 #include <string>
-#include <vector>
+#include <set>
+#include <memory>
 
 class CProcess
 {
-	typedef std::vector<LPVOID> RemoteMemoryAllocations;
-	typedef RemoteMemoryAllocations::iterator RemoteMemoryAllocationIterator;
+	typedef std::set< std::shared_ptr<CRemoteMemoryAllocation> > RemoteMemoryAllocations;
 
 	HANDLE m_hHandle = INVALID_HANDLE_VALUE;
 	std::string m_strProcName;
@@ -18,25 +20,22 @@ public:
 	~CProcess();
 
 	template<typename AddrType, typename ValueType>
-	bool writeMemory(AddrType addr, ValueType val)
-	{
-		return writeMemory(addr, (const ValueType&) val);
-	}
-
-	template<typename AddrType, typename ValueType>
 	bool writeMemory(AddrType addr, const ValueType& val)
 	{
 		if (m_hHandle == INVALID_HANDLE_VALUE)
 			return false;
 
 		SIZE_T uiWritten = 0;
-		BOOL bRet = WriteProcessMemory(_handle, (LPVOID) addr, (LPCVOID) &val, sizeof(ValueType), &uiWritten);
+		BOOL bRet = WriteProcessMemory(m_hHandle, (LPVOID) addr, (LPCVOID) &val, sizeof(ValueType), &uiWritten);
 
 		return bRet > 0 && uiWritten == sizeof(ValueType);
 	}
 
-	RemoteMemoryAllocationIterator allocMemory(SIZE_T dwSize);
-	RemoteMemoryAllocationIterator freeMemory(RemoteMemoryAllocationIterator iterator);
+	std::weak_ptr<CRemoteMemoryAllocation> allocMemory(SIZE_T dwSize);
+	bool freeMemory(std::weak_ptr<CRemoteMemoryAllocation> spMemory);
+
+	HANDLE handle() const;
+	const RemoteMemoryAllocations& memoryAllocations() const;
 
 private:
 	bool openProcess();

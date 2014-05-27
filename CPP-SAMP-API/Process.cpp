@@ -3,7 +3,7 @@
 
 #include <TlHelp32.h>
 
-CProcess::CProcess(const std::string& strProcName) : m_strProcName(strProcName)
+CProcess::CProcess(const std::string& strProcName) : m_hHandle(INVALID_HANDLE_VALUE), m_strProcName(strProcName)
 {
 	openProcess();
 }
@@ -11,11 +11,10 @@ CProcess::CProcess(const std::string& strProcName) : m_strProcName(strProcName)
 
 CProcess::~CProcess()
 {
+	m_vecAllocations.clear();
+
 	if (m_hHandle != INVALID_HANDLE_VALUE)
 	{
-		for (auto it = m_vecAllocations.begin(); it != m_vecAllocations.end(); it++)
-			it = freeMemory(it);
-
 		CloseHandle(m_hHandle);
 		m_hHandle = INVALID_HANDLE_VALUE;
 	}
@@ -23,6 +22,9 @@ CProcess::~CProcess()
 
 bool CProcess::openProcess()
 {
+	if (m_hHandle != INVALID_HANDLE_VALUE)
+		CloseHandle(m_hHandle);
+
 	bool bRet = false;
 
 	PROCESSENTRY32 entry;
@@ -37,7 +39,7 @@ bool CProcess::openProcess()
 	{
 		if (ifind(std::string(entry.szExeFile), m_strProcName))
 		{
-			if ((m_hHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, entry.th32ProcessID)))
+			if ((m_hHandle = OpenProcess(STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFF, FALSE, entry.th32ProcessID)))
 				bRet = true;
 			else
 				m_hHandle = INVALID_HANDLE_VALUE;
@@ -50,27 +52,36 @@ bool CProcess::openProcess()
 	CloseHandle(hSnapShot);
 }
 
-CProcess::RemoteMemoryAllocationIterator CProcess::allocMemory(SIZE_T dwSize)
+std::weak_ptr<CRemoteMemoryAllocation> CProcess::allocMemory(SIZE_T dwSize)
 {
-	RemoteMemoryAllocationIterator iterator = m_vecAllocations.end();
+	std::shared_ptr<CRemoteMemoryAllocation> alloc(new CRemoteMemoryAllocation(this));
 
-	if (dwSize == 0)
-		return iterator;
+	if (!alloc->allocMemory(dwSize))
+		return std::weak_ptr<CRemoteMemoryAllocation>();
 
-	if (m_hHandle == INVALID_HANDLE_VALUE)
-		return iterator;
-
-	LPVOID lpMemory = VirtualAllocEx(m_hHandle, NULL, dwSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
-	if (lpMemory == NULL)
-		return iterator;
-
-	return m_vecAllocations.insert(m_vecAllocations.end(), lpMemory);
+	m_vecAllocations.insert(alloc);
+	return alloc;
 }
 
-CProcess::RemoteMemoryAllocationIterator CProcess::freeMemory(CProcess::RemoteMemoryAllocationIterator iterator)
+bool CProcess::freeMemory(std::weak_ptr<CRemoteMemoryAllocation> spMemory)
 {
-	LPVOID lpMemory = *iterator;
-	BOOL bRet = VirtualFreeEx(m_hHandle, lpMemory, 0, MEM_RELEASE);
+	try
+	{
+		auto p = spMemory.lock();
+		return p->freeMemory() && m_vecAllocations.erase(p->shared_from_this());
+	}
+	catch (...){
+	}
 
-	return m_vecAllocations.erase(iterator);
+	return false;
+}
+
+HANDLE CProcess::handle() const
+{
+	return m_hHandle;
+}
+
+const CProcess::RemoteMemoryAllocations& CProcess::memoryAllocations() const
+{
+	return m_vecAllocations;
 }
