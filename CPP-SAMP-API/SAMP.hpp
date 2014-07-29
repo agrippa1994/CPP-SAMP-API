@@ -15,9 +15,6 @@
 namespace SAMP
 {
 	typedef unsigned char byte;
-	typedef DWORD dword;
-	typedef HANDLE handle;
-	typedef unsigned int uint;
 
 	// List of all needed X86 opcodes.
 	namespace X86
@@ -35,17 +32,17 @@ namespace SAMP
 	{
 		namespace Objects
 		{
-			const uint ChatInfo = 0x212A6C;
+			const DWORD ChatInfo = 0x212A6C;
 		}
 
 		namespace Functions
 		{
-			const uint AddChatMessage = 0x7AA00;
+			const DWORD AddChatMessage = 0x7AA00;
 
-			const uint ShowGameText = 0x643B0;
+			const DWORD ShowGameText = 0x643B0;
 
-			const uint SendSay = 0x4CA0;
-			const uint SendCommand = 0x7BDD0;
+			const DWORD SendSay = 0x4CA0;
+			const DWORD SendCommand = 0x7BDD0;
 		}
 	}
 
@@ -61,15 +58,15 @@ namespace SAMP
 			return *this;
 		}
 
-		InjectData& operator << (dword d)
+		InjectData& operator << (DWORD d)
 		{
 			union {
-				byte bytes[sizeof(dword)];
-				dword d;
+				byte bytes[sizeof(DWORD)];
+				DWORD d;
 			} splitter;
 			splitter.d = d;
 
-			for (uint i = 0; i < 4; i++)
+			for (DWORD i = 0; i < 4; i++)
 				m_cData.push_back(splitter.bytes[i]);
 
 			return *this;
@@ -83,7 +80,7 @@ namespace SAMP
 			} splitter;
 			splitter.d = d;
 
-			for (uint i = 0; i < 4; i++)
+			for (DWORD i = 0; i < 4; i++)
 				m_cData.push_back(splitter.bytes[i]);
 
 			return *this;
@@ -113,7 +110,7 @@ namespace SAMP
 		LPVOID m_pMemory = 0;
 
 	public:
-		static const uint minAllocationSize = 1024;
+		static const DWORD minAllocationSize = 1024;
 
 		explicit RemoteMemory(HANDLE hProc) : m_hProc(hProc)
 		{
@@ -151,7 +148,7 @@ namespace SAMP
 		RemoteMemory	m_callStack;
 		InjectData		m_injectData;
 		const HANDLE	m_hHandle;
-		uint			m_argumentCount = 0;
+		DWORD			m_argumentCount = 0;
 
 		std::vector< std::shared_ptr<RemoteMemory> > m_otherAllocations; // Memory-Allocations for strings
 
@@ -201,7 +198,7 @@ namespace SAMP
 			addArguments(p...);
 		}
 	public:
-		explicit FunctionCaller(handle hHandle, DWORD obj, DWORD func, bool cleanUpStack, bool shouldPushObject, ArgTypes... params) : m_hHandle(hHandle), m_callStack(hHandle)
+		explicit FunctionCaller(HANDLE hHandle, DWORD obj, DWORD func, bool cleanUpStack, bool shouldPushObject, ArgTypes... params) : m_hHandle(hHandle), m_callStack(hHandle)
 		{
 			if (obj && !shouldPushObject)
 				m_injectData << X86::MOV_ECX << (DWORD) obj;
@@ -213,8 +210,8 @@ namespace SAMP
 				addArguments(obj);
 				
 			// Calculate the address (has to be relative!)
-			uint stackOffset = m_injectData.raw().size();
-			DWORD callOffset = func - (uint) m_callStack.address() - stackOffset - 5; // relative
+			DWORD stackOffset = m_injectData.raw().size();
+			DWORD callOffset = func - (DWORD) m_callStack.address() - stackOffset - 5; // relative
 
 			m_injectData << X86::CALL << (DWORD) callOffset;
 			if (cleanUpStack)
