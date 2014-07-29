@@ -10,6 +10,7 @@
 #include <type_traits>
 #include <memory>
 
+#define NO_OBJECT 0
 
 namespace SAMP
 {
@@ -193,6 +194,9 @@ namespace SAMP
 	public:
 		explicit FunctionCaller(handle hHandle, DWORD obj, DWORD func, ArgTypes... params) : m_hHandle(hHandle), m_callStack(hHandle)
 		{
+			if (hHandle == INVALID_HANDLE_VALUE)
+				throw std::exception("Invalid handle value");
+
 			if (obj)
 				m_injectData << X86::MOV_ECX << obj;
 			
@@ -231,22 +235,32 @@ namespace SAMP
 			GetWindowThreadProcessId(FindWindow(0, "GTA:SA:MP"), &dwPID);
 
 			if (dwPID == 0)
+			{
+				m_hHandle = INVALID_HANDLE_VALUE;
 				return false;
-
-			if (dwPID == m_dwPID && m_hHandle != INVALID_HANDLE_VALUE)
+			}
+				
+			if (dwPID == m_dwPID && m_hHandle != INVALID_HANDLE_VALUE && m_dwSAMPBase)
 				return true;
 
 			m_dwPID = dwPID;
 			m_hHandle = OpenProcess(STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFF, FALSE, m_dwPID);
+			if (m_hHandle == INVALID_HANDLE_VALUE)
+				return false;
 
-			return m_hHandle != INVALID_HANDLE_VALUE;
+			if (!openSAMP())
+			{
+				CloseHandle(m_hHandle);
+				m_hHandle = INVALID_HANDLE_VALUE;
+
+				return false;
+			}
+
+			return m_hHandle != INVALID_HANDLE_VALUE && m_dwSAMPBase;
 		}
 
 		bool openSAMP()
 		{
-			if (!openProcess())
-				return false;
-
 			HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, m_dwPID);
 			if (hSnapshot == INVALID_HANDLE_VALUE)
 				return false;
@@ -269,25 +283,15 @@ namespace SAMP
 			return m_dwSAMPBase != 0;
 		}
 
-		bool openAll()
+		template<typename ...T>
+		bool call(DWORD dwObject, DWORD dwFunction, T... args)
 		{
-			return openProcess() && openSAMP();
-		}
-
-	public:
-		explicit SAMP()
-		{
-
-		}
-
-		bool showGameText(const char *text, uint time, uint size)
-		{
-			if (!openAll())
+			if (!openProcess())
 				return false;
 
 			try
 			{
-				FunctionCaller<const char *, int, int>(m_hHandle, 0, m_dwSAMPBase + Addresses::Functions::ShowGameText, text, time, size);
+				FunctionCaller<T...>(m_hHandle, dwObject, dwFunction, args...);
 				return true;
 			}
 			catch (...)
@@ -296,25 +300,49 @@ namespace SAMP
 			}
 		}
 
-		bool sendChat(const char *text)
+		template<typename T>
+		T read(DWORD dwAddress, T onFail = T())
 		{
-			if (!openAll() || text == 0)
+			T t;
+			if (ReadProcessMemory(m_hHandle, (LPCVOID) dwAddress, &t, sizeof(t), 0))
+				return t;
+
+			return onFail;
+
+		}
+	public:
+		explicit SAMP()
+		{
+		}
+
+		bool showGameText(const char *text, int time, int style)
+		{
+			if (text == 0)
 				return false;
 
 			if (strlen(text) == 0)
 				return 0;
 
-			try
-			{
-				DWORD dwAddress = text[0] == '/' ? Addresses::Functions::SendCommand : Addresses::Functions::SendSay;
-
-				FunctionCaller<const char *>(m_hHandle, 0, m_dwSAMPBase + dwAddress, text);
-				return true;
-			}
-			catch (...)
-			{
+			if (!openProcess())
 				return false;
-			}
+
+			call(NO_OBJECT, m_dwSAMPBase + Addresses::Functions::ShowGameText, style, time, text);
+		}
+
+		bool sendChat(const char *text)
+		{
+			if (text == 0)
+				return false;
+
+			if (strlen(text) == 0)
+				return 0;
+
+			DWORD dwAddress = text[0] == '/' ? Addresses::Functions::SendCommand : Addresses::Functions::SendSay;
+
+			if (!openProcess())
+				return false;
+
+			call(NO_OBJECT, m_dwSAMPBase + dwAddress, text);
 		}
 	};
 }
