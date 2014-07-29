@@ -81,6 +81,10 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Addresses.hpp" />
+    <ClInclude Include="InjectData.hpp" />
+    <ClInclude Include="RemoteFunctionCaller.hpp" />
+    <ClInclude Include="RemoteMemory.hpp" />
     <ClInclude Include="SAMP.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
