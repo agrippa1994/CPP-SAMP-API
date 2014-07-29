@@ -1,13 +1,15 @@
 #pragma once
-
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include <TlHelp32.h>
+
 #include <exception>
 #include <string>
 #include <iostream>
 #include <vector>
 #include <type_traits>
 #include <memory>
+
 
 namespace SAMP
 {
@@ -27,6 +29,16 @@ namespace SAMP
 		const byte RETN = 0xC4;
 	}
 
+	namespace Addresses
+	{
+		namespace Functions
+		{
+			const uint ShowGameText = 0x643B0;
+			const uint SendSay = 0x4CA0;
+			const uint SendCommand = 0x7BDD0;
+		}
+	}
+
 	// InjectData is a vector of bytes, which can add dwords too.
 	class InjectData
 	{
@@ -39,22 +51,30 @@ namespace SAMP
 			return *this;
 		}
 
-		InjectData& operator << (int d)
+		InjectData& operator << (dword d)
 		{
-			byte bytes[4] = { d >> 24 & 0xFF, d >> 16 & 0xFF, d >> 8 & 0xFF, d & 0xFF };
+			union {
+				byte bytes[sizeof(dword)];
+				dword d;
+			} splitter;
+			splitter.d = d;
 
 			for (uint i = 0; i < 4; i++)
-				m_cData.push_back(bytes[i]);
+				m_cData.push_back(splitter.bytes[i]);
 
 			return *this;
 		}
 
-		InjectData& operator << (dword d)
+		InjectData& operator << (int d)
 		{
-			byte bytes[4] = { d >> 24 & 0xFF, d >> 16 & 0xFF, d >> 8 & 0xFF, d & 0xFF };
+			union {
+				byte bytes[sizeof(int)];
+				int d;
+			} splitter;
+			splitter.d = d;
 
 			for (uint i = 0; i < 4; i++)
-				m_cData.push_back(bytes[i]);
+				m_cData.push_back(splitter.bytes[i]);
 
 			return *this;
 		}
@@ -69,8 +89,14 @@ namespace SAMP
 		{
 			return m_cData;
 		}
+
+		std::vector<byte>& raw()
+		{
+			return m_cData;
+		}
 	};
 
+	// Class which holds memory and uses RAII for deinitialization
 	class RemoteMemory
 	{
 		HANDLE m_hProc;
@@ -108,12 +134,14 @@ namespace SAMP
 		}
 	};
 
+	// Class which can call a function in a remote process
 	template<typename ...ArgTypes>
 	class FunctionCaller
 	{
-		RemoteMemory m_callStack;
-		InjectData m_injectData;
-		const HANDLE m_hHandle;
+		RemoteMemory	m_callStack;
+		InjectData		m_injectData;
+		const HANDLE	m_hHandle;
+		uint			m_argumentCount = 0;
 
 		std::vector< std::shared_ptr<RemoteMemory> > m_otherAllocations; // Memory-Allocations for strings
 
@@ -147,7 +175,7 @@ namespace SAMP
 		template<typename T>
 		typename std::enable_if< std::is_arithmetic<T>::value>::type addArgument(T t)
 		{
-			m_injectData << X86::PUSH << DWORD(t);
+			m_injectData << X86::PUSH << T(t);
 		}
 
 		void addArguments()
@@ -157,6 +185,8 @@ namespace SAMP
 		template<typename T, typename ...U>
 		void addArguments(T t, U... p)
 		{
+			m_argumentCount++;
+
 			addArgument(t);
 			addArguments(p...);
 		}
@@ -166,45 +196,125 @@ namespace SAMP
 			if (obj)
 				m_injectData << X86::MOV_ECX << obj;
 			
+			// Add arguments
 			addArguments(params...);
 
-			std::vector<byte>& bytes = m_injectData;
-			int callOffset = func - ((uint) (LPVOID) m_callStack + bytes.size() + 5); // relative
+			// Calculate the address (has to be relative!)
+			uint stackOffset = m_injectData.raw().size();
+			DWORD callOffset = func - (uint) m_callStack.address() - stackOffset - 5; // relative
 
-			m_injectData += X86::CALL;
-			m_injectData += int(callOffset);
-			m_injectData += X86::RET;
+			m_injectData << X86::CALL << (DWORD) callOffset << X86::RET;
 
-			BOOL bRet = WriteProcessMemory(m_hHandle, m_callStack, bytes.data(), bytes.size(), 0);
-			if (bRet == 0)
+			DWORD dwWritten = 0;
+			BOOL bRet = WriteProcessMemory(m_hHandle, m_callStack, m_injectData.raw().data(), m_injectData.raw().size(), &dwWritten);
+			if (bRet == 0 || dwWritten != m_injectData.raw().size())
 				throw std::exception("Memory couldn't be written!");
 
-// 			auto hThread = CreateRemoteThread(m_hHandle, 0, 0, (LPTHREAD_START_ROUTINE) (LPVOID) m_callStack, 0, 0, 0);
-// 			if (hThread == 0)
-// 				throw std::exception("Remote-Thread couldn't be created!");
-// 
-// 			WaitForSingleObject(hThread, INFINITE);
-// 			CloseHandle(hThread);
+			auto hThread = CreateRemoteThread(m_hHandle, 0, 0, (LPTHREAD_START_ROUTINE) (LPVOID) m_callStack, 0, 0, 0);
+			if (hThread == 0)
+				throw std::exception("Remote-Thread couldn't be created!");
+
+			WaitForSingleObject(hThread, INFINITE);
+			CloseHandle(hThread);
 		}
 	};
 
 	class SAMP
 	{
 		DWORD	m_dwPID = 0;
+		DWORD	m_dwSAMPBase = 0;
 		HANDLE	m_hHandle = INVALID_HANDLE_VALUE;
-		LPVOID  m_pRemoteMemory = 0;
 
 		bool openProcess()
 		{
+			DWORD dwPID = 0;
+			GetWindowThreadProcessId(FindWindow(0, "GTA:SA:MP"), &dwPID);
 
+			if (dwPID == 0)
+				return false;
+
+			if (dwPID == m_dwPID && m_hHandle != INVALID_HANDLE_VALUE)
+				return true;
+
+			m_dwPID = dwPID;
+			m_hHandle = OpenProcess(STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFF, FALSE, m_dwPID);
+
+			return m_hHandle != INVALID_HANDLE_VALUE;
 		}
 
-		template<typename T>
-		bool callRemoteFunction();
+		bool openSAMP()
+		{
+			if (!openProcess())
+				return false;
+
+			HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, m_dwPID);
+			if (hSnapshot == INVALID_HANDLE_VALUE)
+				return false;
+
+			MODULEENTRY32 entry;
+			entry.dwSize = sizeof(MODULEENTRY32);
+
+			Module32First(hSnapshot, &entry);
+			do
+			{
+				if (_stricmp(entry.szModule, "samp.dll") == 0)
+				{
+					m_dwSAMPBase = (DWORD) entry.modBaseAddr;
+					break;
+				}
+			} 
+			while (Module32Next(hSnapshot, &entry));
+
+			CloseHandle(hSnapshot);
+			return m_dwSAMPBase != 0;
+		}
+
+		bool openAll()
+		{
+			return openProcess() && openSAMP();
+		}
+
 	public:
 		explicit SAMP()
 		{
 
+		}
+
+		bool showGameText(const char *text, uint time, uint size)
+		{
+			if (!openAll())
+				return false;
+
+			try
+			{
+				FunctionCaller<const char *, int, int>(m_hHandle, 0, m_dwSAMPBase + Addresses::Functions::ShowGameText, text, time, size);
+				return true;
+			}
+			catch (...)
+			{
+				return false;
+			}
+		}
+
+		bool sendChat(const char *text)
+		{
+			if (!openAll() || text == 0)
+				return false;
+
+			if (strlen(text) == 0)
+				return 0;
+
+			try
+			{
+				DWORD dwAddress = text[0] == '/' ? Addresses::Functions::SendCommand : Addresses::Functions::SendSay;
+
+				FunctionCaller<const char *>(m_hHandle, 0, m_dwSAMPBase + dwAddress, text);
+				return true;
+			}
+			catch (...)
+			{
+				return false;
+			}
 		}
 	};
 }
