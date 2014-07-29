@@ -5,7 +5,6 @@
 
 namespace SAMP
 {
-
 	typedef unsigned char byte;
 
 	// InjectData is a vector of bytes, which can add dwords too.

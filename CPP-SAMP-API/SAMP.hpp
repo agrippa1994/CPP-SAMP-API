@@ -10,9 +10,9 @@ namespace SAMP
 {
 	class SAMP
 	{
-		DWORD	m_dwPID = 0;
-		DWORD	m_dwSAMPBase = 0;
-		HANDLE	m_hHandle = INVALID_HANDLE_VALUE;
+		DWORD m_dwPID = 0;
+		DWORD m_dwSAMPBase = 0;
+		HANDLE m_hHandle = INVALID_HANDLE_VALUE;
 
 		bool openProcess()
 		{
@@ -94,6 +94,9 @@ namespace SAMP
 		explicit SAMP()
 		{
 		}
+
+		SAMP(const SAMP&) = delete;
+		SAMP(SAMP &&) = delete;
 
 		bool showGameText(const char *text, int time, int style)
 		{

@@ -25,10 +25,10 @@ namespace SAMP
 	template<typename ...ArgTypes>
 	class RemoteFunctionCaller
 	{
-		RemoteMemory	m_callStack;
-		InjectData		m_injectData;
-		const HANDLE	m_hHandle;
-		DWORD			m_argumentCount = 0;
+		RemoteMemory m_callStack;
+		InjectData m_injectData;
+		const HANDLE m_hHandle;
+		DWORD m_argumentCount = 0;
 
 		std::vector< std::shared_ptr<RemoteMemory> > m_otherAllocations; // Memory-Allocations for strings
 
@@ -83,21 +83,17 @@ namespace SAMP
 			DWORD callOffset = func - (DWORD) m_callStack.address() - stackOffset - 5; // relative
 
 			m_injectData << X86::CALL << (DWORD) callOffset;
-			if (cleanUpStack)
-			{
-				// add esp, N
-				m_injectData << (byte) 0x83 << (byte) 0xC4 << (byte) (m_argumentCount * 4) << X86::RET;
-			}
-			else
-			{
-				m_injectData << X86::RET;
-			}
 
-			BOOL bRet = WriteProcessMemory(m_hHandle, m_callStack, m_injectData.raw().data(), m_injectData.raw().size(), NULL);
-			if (bRet == 0)
+			// Clean up the stack if necessary
+			if (cleanUpStack) // add esp, N
+				m_injectData << (byte) 0x83 << (byte) 0xC4 << (byte) (m_argumentCount * 4) << X86::RET;
+			else
+				m_injectData << X86::RET;
+
+			if(!WriteProcessMemory(m_hHandle, m_callStack, m_injectData.raw().data(), m_injectData.raw().size(), NULL))
 				throw std::exception("Memory couldn't be written!");
 
-			auto hThread = CreateRemoteThread(m_hHandle, 0, 0, (LPTHREAD_START_ROUTINE) (LPVOID) m_callStack, 0, 0, 0);
+			HANDLE hThread = CreateRemoteThread(m_hHandle, 0, 0, (LPTHREAD_START_ROUTINE) (LPVOID) m_callStack, 0, 0, 0);
 			if (hThread == 0)
 				throw std::exception("Remote-Thread couldn't be created!");
 
