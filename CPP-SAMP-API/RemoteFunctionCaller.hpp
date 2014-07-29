@@ -18,9 +18,7 @@ namespace SAMP
 		const byte CALL = 0xE8;
 		const byte MOV_ECX = 0x8B;
 		const byte PUSH = 0x68;
-		const byte PUSH_ECX = 0x51;
 		const byte RET = 0xC3;
-		const byte RETN = 0xC4;
 	}
 
 	// Class which can call a function in a remote process
@@ -35,10 +33,12 @@ namespace SAMP
 		std::vector< std::shared_ptr<RemoteMemory> > m_otherAllocations; // Memory-Allocations for strings
 
 		template<typename T>
-		typename std::enable_if< std::is_same<T, const char *>::value, T >::type addArgument(T t)
+		typename std::enable_if< std::is_same<T, const char *>::value || std::is_same<T, char *>::value, T >::type addArgument(T t)
 		{
-			m_otherAllocations.push_back(std::shared_ptr<RemoteMemory>(new RemoteMemory(m_hHandle)));
-			LPVOID ptr = m_otherAllocations.back()->address();
+			std::shared_ptr<RemoteMemory> memory(new RemoteMemory(m_hHandle));
+			m_otherAllocations.push_back(memory);
+
+			LPVOID ptr = memory->address();
 
 			BOOL bRet = WriteProcessMemory(m_hHandle, ptr, t, strlen(t), 0);
 			if (bRet == 0)
