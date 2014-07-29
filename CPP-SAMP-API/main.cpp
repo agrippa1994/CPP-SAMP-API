@@ -1,16 +1,12 @@
 #include <iostream>
 #include <string>
 
-#include "Process.h"
+#include "SAMP.hpp"
+
 
 int main()
 {
-	CProcess process("cpp-samp-api");
-
-	int x = 5;
-	std::cout << process.writeMemory(&x, 10) << std::endl;
-
-	std::cout << x << std::endl;
+	using namespace SAMP;
 
 	std::cin.get();
 }
