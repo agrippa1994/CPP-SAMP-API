@@ -10,8 +10,9 @@ int main()
 	for (;; Sleep(100))
 	if (GetAsyncKeyState(VK_RETURN))
 	{
-		std::cout << samp.sendChat("hallo welt") << std::endl;
-		std::cout << samp.showGameText("hallo", 5000, 1) << std::endl;
+		//std::cout << samp.sendChat("hallo welt") << std::endl;
+		//std::cout << samp.showGameText("hallo", 5000, 1) << std::endl;
+		std::cout << samp.addChatMessage("Hallo Welt :)") << std::endl;
 	}
 			
 

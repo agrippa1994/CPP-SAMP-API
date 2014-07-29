@@ -24,17 +24,26 @@ namespace SAMP
 	{
 		const byte NOP = 0x90;
 		const byte CALL = 0xE8;
-		const byte MOV_ECX = 0xB9;
+		const byte MOV_ECX = 0x8B;
 		const byte PUSH = 0x68;
+		const byte PUSH_ECX = 0x51;
 		const byte RET = 0xC3;
 		const byte RETN = 0xC4;
 	}
 
 	namespace Addresses
 	{
+		namespace Objects
+		{
+			const uint ChatInfo = 0x212A6C;
+		}
+
 		namespace Functions
 		{
+			const uint AddChatMessage = 0x7AA00;
+
 			const uint ShowGameText = 0x643B0;
+
 			const uint SendSay = 0x4CA0;
 			const uint SendCommand = 0x7BDD0;
 		}
@@ -192,22 +201,31 @@ namespace SAMP
 			addArguments(p...);
 		}
 	public:
-		explicit FunctionCaller(handle hHandle, DWORD obj, DWORD func, ArgTypes... params) : m_hHandle(hHandle), m_callStack(hHandle)
+		explicit FunctionCaller(handle hHandle, DWORD obj, DWORD func, bool cleanUpStack, bool shouldPushObject, ArgTypes... params) : m_hHandle(hHandle), m_callStack(hHandle)
 		{
-			if (hHandle == INVALID_HANDLE_VALUE)
-				throw std::exception("Invalid handle value");
-
-			if (obj)
-				m_injectData << X86::MOV_ECX << obj;
+			if (obj && !shouldPushObject)
+				m_injectData << X86::MOV_ECX << (DWORD) obj;
 			
 			// Add arguments
 			addArguments(params...);
 
+			if (shouldPushObject && obj)
+				addArguments(obj);
+				
 			// Calculate the address (has to be relative!)
 			uint stackOffset = m_injectData.raw().size();
 			DWORD callOffset = func - (uint) m_callStack.address() - stackOffset - 5; // relative
 
-			m_injectData << X86::CALL << (DWORD) callOffset << X86::RET;
+			m_injectData << X86::CALL << (DWORD) callOffset;
+			if (cleanUpStack)
+			{
+				// add esp, N
+				m_injectData << (byte) 0x83 << (byte) 0xC4 << (byte) (m_argumentCount * 4) << X86::RET;
+			}
+			else
+			{
+				m_injectData << X86::RET;
+			}
 
 			DWORD dwWritten = 0;
 			BOOL bRet = WriteProcessMemory(m_hHandle, m_callStack, m_injectData.raw().data(), m_injectData.raw().size(), &dwWritten);
@@ -284,14 +302,14 @@ namespace SAMP
 		}
 
 		template<typename ...T>
-		bool call(DWORD dwObject, DWORD dwFunction, T... args)
+		bool call(DWORD dwObject, DWORD dwFunction, bool stackCleanup, bool shouldPushObject, T... args)
 		{
 			if (!openProcess())
 				return false;
 
 			try
 			{
-				FunctionCaller<T...>(m_hHandle, dwObject, dwFunction, args...);
+				FunctionCaller<T...>(m_hHandle, dwObject, dwFunction, stackCleanup, shouldPushObject, args...);
 				return true;
 			}
 			catch (...)
@@ -321,12 +339,12 @@ namespace SAMP
 				return false;
 
 			if (strlen(text) == 0)
-				return 0;
+				return false;
 
 			if (!openProcess())
 				return false;
 
-			call(NO_OBJECT, m_dwSAMPBase + Addresses::Functions::ShowGameText, style, time, text);
+			return call(NO_OBJECT, m_dwSAMPBase + Addresses::Functions::ShowGameText, false, false, style, time, text);
 		}
 
 		bool sendChat(const char *text)
@@ -335,14 +353,32 @@ namespace SAMP
 				return false;
 
 			if (strlen(text) == 0)
-				return 0;
+				return false;
 
 			DWORD dwAddress = text[0] == '/' ? Addresses::Functions::SendCommand : Addresses::Functions::SendSay;
 
 			if (!openProcess())
 				return false;
 
-			call(NO_OBJECT, m_dwSAMPBase + dwAddress, text);
+			return call(NO_OBJECT, m_dwSAMPBase + dwAddress, false, false, text);
+		}
+
+		bool addChatMessage(const char *text)
+		{
+			if (text == 0)
+				return false;
+
+			if (strlen(text) == 0)
+				return false;
+
+			if (!openProcess())
+				return false;
+
+			DWORD dwObject = read(m_dwSAMPBase + Addresses::Objects::ChatInfo, 0);
+			if (dwObject == 0)
+				return false;
+
+			return call(dwObject, m_dwSAMPBase + Addresses::Functions::AddChatMessage, true, true, text);
 		}
 	};
 }
