@@ -42,5 +42,10 @@ namespace SAMP
 		{
 			return m_cData;
 		}
+
+		const std::vector<byte>& raw() const
+		{
+			return m_cData;
+		}
 	};
 }

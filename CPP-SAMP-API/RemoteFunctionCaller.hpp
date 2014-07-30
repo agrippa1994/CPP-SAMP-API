@@ -26,7 +26,7 @@ namespace SAMP
 	template<typename ...ArgTypes>
 	class RemoteFunctionCaller
 	{
-		RemoteMemory m_callStack;
+		RemoteMemory m_remoteMemory;
 		InjectData m_injectData;
 		const HANDLE m_hHandle;
 		DWORD m_argumentCount = 0;
@@ -39,13 +39,10 @@ namespace SAMP
 			std::shared_ptr<RemoteMemory> memory(new RemoteMemory(m_hHandle));
 			m_otherAllocations.push_back(memory);
 
-			LPVOID ptr = memory->address();
-
-			BOOL bRet = WriteProcessMemory(m_hHandle, ptr, t, strlen(t), 0);
-			if (bRet == 0)
+			if(!memory->writeArray(t, strlen(t)))
 				throw std::exception("Memory couldn't be written!");
 
-			m_injectData << X86::PUSH << DWORD(ptr);
+			m_injectData << X86::PUSH << (DWORD) memory->address();
 		}
 
 		template<typename T>
@@ -68,7 +65,7 @@ namespace SAMP
 		}
 	public:
 
-		explicit RemoteFunctionCaller(HANDLE hHandle, DWORD obj, DWORD func, bool cleanUpStack, ArgTypes... params) : m_hHandle(hHandle), m_callStack(hHandle)
+		explicit RemoteFunctionCaller(HANDLE hHandle, DWORD obj, DWORD func, bool cleanUpStack, ArgTypes... params) : m_hHandle(hHandle), m_remoteMemory(hHandle)
 		{
 			if (obj)
 				m_injectData << X86::MOV_ECX << (DWORD) obj;
@@ -78,7 +75,7 @@ namespace SAMP
 
 			// Calculate the address (has to be relative!)
 			DWORD stackOffset = m_injectData.raw().size();
-			DWORD callOffset = func - (DWORD) m_callStack.address() - stackOffset - 5; // relative
+			DWORD callOffset = func - (DWORD) m_remoteMemory.address() - stackOffset - 5; // relative
 
 			m_injectData << X86::CALL << (DWORD) callOffset;
 
@@ -88,15 +85,13 @@ namespace SAMP
 			else
 				m_injectData << X86::RET;
 
-			if(!WriteProcessMemory(m_hHandle, m_callStack, m_injectData.raw().data(), m_injectData.raw().size(), NULL))
+			// Load X86-Code into the process
+			if (!(m_remoteMemory = m_injectData))
 				throw std::exception("Memory couldn't be written!");
 
-			HANDLE hThread = CreateRemoteThread(m_hHandle, 0, 0, (LPTHREAD_START_ROUTINE) (LPVOID) m_callStack, 0, 0, 0);
-			if (hThread == 0)
-				throw std::exception("Remote-Thread couldn't be created!");
-
-			WaitForSingleObject(hThread, INFINITE);
-			CloseHandle(hThread);
+			// Execute loaded X86-Code
+			if (!m_remoteMemory())
+				throw std::exception("Thread couldn't be executed!");
 		}
 	};
 }
