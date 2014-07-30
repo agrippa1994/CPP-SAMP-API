@@ -19,6 +19,7 @@ namespace SAMP
 		const byte MOV_ECX = 0x8B;
 		const byte PUSH = 0x68;
 		const byte RET = 0xC3;
+		const word ADD_ESP = 0xC483;
 	}
 
 	// Class which can call a function in a remote process
@@ -83,7 +84,7 @@ namespace SAMP
 
 			// Clean up the stack if necessary
 			if (cleanUpStack) // add esp, N
-				m_injectData << (byte) 0x83 << (byte) 0xC4 << (byte) (m_argumentCount * 4) << X86::RET;
+				m_injectData << X86::ADD_ESP << (byte)(m_argumentCount * 4) << X86::RET;
 			else
 				m_injectData << X86::RET;
 

@@ -2,10 +2,12 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <vector>
+#include <type_traits>
 
 namespace SAMP
 {
 	typedef unsigned char byte;
+	typedef unsigned short word;
 
 	// InjectData is a vector of bytes, which can add dwords too.
 	class InjectData
@@ -13,35 +15,19 @@ namespace SAMP
 		std::vector<byte> m_cData;
 
 	public:
-		InjectData& operator << (byte d)
-		{
-			m_cData.push_back(d);
-			return *this;
-		}
 
-		InjectData& operator << (DWORD d)
+		template<typename T, typename = std::enable_if<std::is_arithmetic<T>::value>::type>
+		InjectData& operator << (T t)
 		{
-			union {
-				byte bytes[sizeof(DWORD)];
-				DWORD d;
+			const size_t size = sizeof(T);
+
+			union{
+				byte bytes[size];
+				T complete;
 			} splitter;
-			splitter.d = d;
 
-			for (DWORD i = 0; i < 4; i++)
-				m_cData.push_back(splitter.bytes[i]);
-
-			return *this;
-		}
-
-		InjectData& operator << (int d)
-		{
-			union {
-				byte bytes[sizeof(int)];
-				int d;
-			} splitter;
-			splitter.d = d;
-
-			for (DWORD i = 0; i < 4; i++)
+			splitter.complete = t;
+			for (size_t i = 0; i < size; i++)
 				m_cData.push_back(splitter.bytes[i]);
 
 			return *this;
