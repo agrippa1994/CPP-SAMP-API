@@ -67,16 +67,13 @@ namespace SAMP
 		}
 	public:
 
-		explicit RemoteFunctionCaller(HANDLE hHandle, DWORD obj, DWORD func, bool cleanUpStack, bool shouldPushObject, ArgTypes... params) : m_hHandle(hHandle), m_callStack(hHandle)
+		explicit RemoteFunctionCaller(HANDLE hHandle, DWORD obj, DWORD func, bool cleanUpStack, ArgTypes... params) : m_hHandle(hHandle), m_callStack(hHandle)
 		{
-			if (obj && !shouldPushObject)
+			if (obj)
 				m_injectData << X86::MOV_ECX << (DWORD) obj;
 
 			// Add arguments
 			addArguments(params...);
-
-			if (shouldPushObject && obj)
-				addArguments(obj);
 
 			// Calculate the address (has to be relative!)
 			DWORD stackOffset = m_injectData.raw().size();

@@ -64,14 +64,14 @@ namespace SAMP
 		}
 
 		template<typename ...T>
-		bool call(DWORD dwObject, DWORD dwFunction, bool stackCleanup, bool shouldPushObject, T... args)
+		bool call(DWORD dwObject, DWORD dwFunction, bool stackCleanup, T... args)
 		{
 			if (!openSAMP())
 				return false;
 
 			try
 			{
-				RemoteFunctionCaller<T...>(m_hHandle, dwObject, dwFunction, stackCleanup, shouldPushObject, args...);
+				RemoteFunctionCaller<T...>(m_hHandle, dwObject, dwFunction, stackCleanup, args...);
 				return true;
 			}
 			catch (...)
@@ -88,8 +88,8 @@ namespace SAMP
 				return t;
 
 			return onFail;
-
 		}
+
 	public:
 		explicit SAMP()
 		{
@@ -109,7 +109,7 @@ namespace SAMP
 			if (!openSAMP())
 				return false;
 
-			return call(NO_OBJECT, m_dwSAMPBase + Addresses::Functions::ShowGameText, false, false, style, time, text);
+			return call(NO_OBJECT, m_dwSAMPBase + Addresses::Functions::ShowGameText, false, style, time, text);
 		}
 
 		bool sendChat(const char *text)
@@ -125,7 +125,7 @@ namespace SAMP
 			if (!openSAMP())
 				return false;
 
-			return call(NO_OBJECT, m_dwSAMPBase + dwAddress, false, false, text);
+			return call(NO_OBJECT, m_dwSAMPBase + dwAddress, false, text);
 		}
 
 		bool addChatMessage(const char *text)
@@ -143,7 +143,7 @@ namespace SAMP
 			if (dwObject == 0)
 				return false;
 
-			return call(dwObject, m_dwSAMPBase + Addresses::Functions::AddChatMessage, true, true, text);
+			return call(NO_OBJECT, m_dwSAMPBase + Addresses::Functions::AddChatMessage, true, text, dwObject);
 		}
 	};
 }
