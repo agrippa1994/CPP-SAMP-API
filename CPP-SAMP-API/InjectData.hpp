@@ -33,12 +33,6 @@ namespace SAMP
 			return *this;
 		}
 
-		template<typename T>
-		InjectData& operator+=(T t)
-		{
-			return *this << (t);
-		}
-
 		operator std::vector<byte>&()
 		{
 			return m_cData;
