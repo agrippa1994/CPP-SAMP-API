@@ -42,7 +42,7 @@ namespace SAMP
 	{
 		const byte NOP = 0x90;
 		const byte CALL = 0xE8;
-		const byte MOV_ECX = 0x8B;
+		const byte MOV_ECX = 0xB9;
 		const byte PUSH = 0x68;
 		const byte RET = 0xC3;
 		const word ADD_ESP = 0xC483;
@@ -60,7 +60,7 @@ namespace SAMP
 		std::vector< std::shared_ptr<RemoteMemory> > m_otherAllocations; // Memory-Allocations for strings
 
 		template<typename T>
-		typename std::enable_if< std::is_same<T, const char *>::value || std::is_same<T, char *>::value, T >::type addArgument(T t)
+		typename std::enable_if< std::is_same<T, const char *>::value, T >::type addArgument(T t)
 		{
 			std::shared_ptr<RemoteMemory> memory(new RemoteMemory(m_hHandle));
 			m_otherAllocations.push_back(memory);

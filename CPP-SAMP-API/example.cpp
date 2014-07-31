@@ -39,8 +39,8 @@ int main()
 		std::cout << samp.sendChat("hallo welt") << std::endl;
 		std::cout << samp.showGameText("hallo", 5000, 1) << std::endl;
 		std::cout << samp.addChatMessage("Hallo Welt :)") << std::endl;
+		std::cout << samp.showDialog(0, "Info", "Hallo Welt :)", "Ok") << std::endl;
 	}
 			
-
 	std::cin.get();
 }

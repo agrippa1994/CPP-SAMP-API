@@ -171,5 +171,20 @@ namespace SAMP
 
 			return call(NO_OBJECT, m_dwSAMPBase + Addresses::Functions::AddChatMessage, true, text, dwObject);
 		}
+
+		bool showDialog(int style, const char *caption, const char *info, const char *button)
+		{
+			if (caption == 0 || info == 0 || button == 0)
+				return false;
+
+			if (!openSAMP())
+				return false;
+
+			DWORD dwObject = read(m_dwSAMPBase + Addresses::Objects::DialogInfo, 0);
+			if (dwObject == 0)
+				return false;
+
+			return call(dwObject, m_dwSAMPBase + Addresses::Functions::ShowDialog, false, 0, m_dwSAMPBase + Addresses::Other::AdditionalDialogInfo, button, info, caption, style, 1);
+		}
 	};
 }

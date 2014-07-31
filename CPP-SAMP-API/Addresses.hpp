@@ -33,6 +33,8 @@ namespace Addresses
 	namespace Objects
 	{
 		const DWORD ChatInfo = 0x212A6C;
+		const DWORD DialogInfo = 0x212A40;
+
 	}
 
 	namespace Functions
@@ -43,5 +45,12 @@ namespace Addresses
 
 		const DWORD SendSay = 0x4CA0;
 		const DWORD SendCommand = 0x7BDD0;
+
+		const DWORD ShowDialog = 0x816F0;
+	}
+
+	namespace Other
+	{
+		const DWORD AdditionalDialogInfo = 0xCE8F1;
 	}
 }
