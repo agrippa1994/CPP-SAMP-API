@@ -43,7 +43,7 @@ namespace SAMP
 		bool openProcess()
 		{
 			DWORD dwPID = 0;
-			GetWindowThreadProcessId(FindWindow(0, "GTA:SA:MP"), &dwPID);
+            GetWindowThreadProcessId(FindWindowA(0, "GTA:SA:MP"), &dwPID);
 
 			if (dwPID == 0)
 			{
@@ -77,7 +77,11 @@ namespace SAMP
 			Module32First(hSnapshot, &entry);
 			do
 			{
+#ifdef _UNICODE
+                if (_wcsicmp(entry.szModule, L"samp.dll") == 0)
+#else
 				if (_stricmp(entry.szModule, "samp.dll") == 0)
+#endif
 				{
 					m_dwSAMPBase = (DWORD) entry.modBaseAddr;
 					break;
@@ -186,5 +190,35 @@ namespace SAMP
 
 			return call(dwObject, m_dwSAMPBase + Addresses::Functions::ShowDialog, false, 0, m_dwSAMPBase + Addresses::Other::AdditionalDialogInfo, button, info, caption, style, 1);
 		}
+
+        bool isInForeground() const
+        {
+            return GetForegroundWindow() == FindWindowA(0, "GTA:SA:MP");
+        }
+
+        bool isInChat()
+        {
+            if (!openSAMP())
+                return false;
+
+            DWORD dwPtr = m_dwSAMPBase + Addresses::Objects::InChatInfo;
+            DWORD dwAddress = read(dwPtr, 0) + Addresses::Other::InChatOffset;
+            if(dwAddress == 0)
+                return false;
+
+            return read(dwAddress, 0) > 0;
+        }
+
+        float getPlayerHealth()
+        {
+            if(!openSAMP())
+                return false;
+
+            DWORD dwCPed = read(0xB6F5F0, 0);
+            if(dwCPed == 0)
+                return 0.0f;
+
+            return read<float>(dwCPed + 0x540, 0.0f);
+        }
 	};
 }

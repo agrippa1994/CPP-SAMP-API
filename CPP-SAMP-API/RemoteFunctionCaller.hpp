@@ -69,6 +69,8 @@ namespace SAMP
 				throw std::exception("Memory couldn't be written!");
 
 			m_injectData << X86::PUSH << (DWORD) memory->address();
+
+            return t;
 		}
 
 		template<typename T>

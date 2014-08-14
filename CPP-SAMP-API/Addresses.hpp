@@ -35,6 +35,7 @@ namespace Addresses
 		const DWORD ChatInfo = 0x212A6C;
 		const DWORD DialogInfo = 0x212A40;
 
+        const DWORD InChatInfo = 0x212A94;
 	}
 
 	namespace Functions
@@ -52,5 +53,7 @@ namespace Addresses
 	namespace Other
 	{
 		const DWORD AdditionalDialogInfo = 0xCE8F1;
+
+        const DWORD InChatOffset = 0x55;
 	}
 }
