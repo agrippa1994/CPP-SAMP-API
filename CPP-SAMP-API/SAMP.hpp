@@ -77,7 +77,7 @@ namespace SAMP
 			Module32First(hSnapshot, &entry);
 			do
 			{
-#ifdef _UNICODE
+#ifdef UNICODE
                 if (_wcsicmp(entry.szModule, L"samp.dll") == 0)
 #else
 				if (_stricmp(entry.szModule, "samp.dll") == 0)
